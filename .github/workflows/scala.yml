@@ -7,9 +7,9 @@ name: Scala CI
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "forex-local-proxy" ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "forex-local-proxy" ]
 
 permissions:
   contents: write
