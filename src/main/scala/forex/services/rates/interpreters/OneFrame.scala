@@ -13,12 +13,13 @@ import org.http4s.client.Client
 import org.http4s.implicits._
 import org.http4s.{Header, Request}
 import org.log4s.getLogger
+import scala.collection.mutable
 
 class OneFrame[F[_]: Sync](client: Client[F]) extends Algebra[F] {
 
   private val logger = getLogger
 
-  private var cache: Map[Rate.Pair, Rate] = Map()
+  private val cache = mutable.Map[Rate.Pair, Rate]()
 
   // TODO make domain, port, token configurable
   override def get(pair: Rate.Pair): F[Error Either Rate] =
