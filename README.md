@@ -24,7 +24,8 @@ docker pull paidyinc/one-frame
 docker run -p 8080:8080 paidyinc/one-frame
 ```
 
-Local proxy can be started with `sbt run`
-Requests look like http://localhost:8081/rates?from=USD&to=JPY
+Local proxy can be started with `sbt run`.
 
-Tests can be run with `sbt test`
+Requests look like http://localhost:8081/rates?from=USD&to=JPY.
+
+Tests can be run with `sbt test`.
