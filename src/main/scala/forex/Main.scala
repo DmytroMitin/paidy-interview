@@ -21,7 +21,8 @@ class Application[F[_]: ConcurrentEffect: Timer] {
     for {
       config <- Config.stream("app")
       client <- BlazeClientBuilder[F](ec).stream
-      module = new Module[F](config, new OneFrameNoCaching[F](client))
+      noCaching = new OneFrameNoCaching[F](client, config.oneFrame.host, config.oneFrame.port, config.oneFrame.token)
+      module = new Module[F](config, noCaching)
       _ <- BlazeServerBuilder[F](ec)
             .bindHttp(config.http.port, config.http.host)
             .withHttpApp(module.httpApp)
