@@ -39,6 +39,10 @@ object Protocol {
   implicit val responseEncoder: Encoder[GetApiResponse] =
     deriveConfiguredEncoder[GetApiResponse]
 
+  implicit val responseDecoder: Decoder[GetApiResponse] = deriveConfiguredDecoder
+
+  implicit def responseEntityDecoder[F[_] : Sync]: EntityDecoder[F, GetApiResponse] = jsonOf
+
   final case class GetOneFrameApiResponse(
       from: Currency,
       to: Currency,
@@ -50,7 +54,6 @@ object Protocol {
 
   implicit val oneFrameResponseDecoder: Decoder[GetOneFrameApiResponse] = deriveConfiguredDecoder
 
-  implicit def oneFrameResponseEntityDecoder[F[_] : Sync]: EntityDecoder[F, List[GetOneFrameApiResponse]] =
-    jsonOf
+  implicit def oneFrameResponseEntityDecoder[F[_] : Sync]: EntityDecoder[F, List[GetOneFrameApiResponse]] = jsonOf
 
 }

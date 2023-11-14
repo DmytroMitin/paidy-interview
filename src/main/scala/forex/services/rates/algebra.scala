@@ -1,8 +1,13 @@
 package forex.services.rates
 
-import forex.domain.Rate
 import errors._
+import forex.domain.Rate
+import forex.http.rates.Protocol.GetOneFrameApiResponse
 
-trait Algebra[F[_]] {
+trait CachingAlgebra[F[_]] {
   def get(pair: Rate.Pair): F[Error Either Rate]
+}
+
+trait NoCachingAlgebra[F[_]] {
+  def get(pair: Rate.Pair): F[List[GetOneFrameApiResponse]]
 }
