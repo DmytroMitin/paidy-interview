@@ -1,8 +1,8 @@
 package forex
 
-import cats.effect.{ExitCode, IO, IOApp}
+import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.applicative._
-import forex.config.{ApplicationConfig, HttpConfig}
+import forex.config.{ApplicationConfig, HttpConfig, OneFrameConfig}
 import forex.domain.{Currency, Price, Rate, Timestamp}
 import forex.http.rates.Protocol
 import forex.http.rates.Protocol.{GetApiResponse, GetOneFrameApiResponse}
@@ -12,9 +12,15 @@ import org.http4s.{EntityDecoder, Request, Response}
 import org.http4s.implicits._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
-class SpecHelpers(val time: Timestamp) extends AnyFlatSpec with should.Matchers with IOApp {
+class SpecHelpers(val time: Timestamp) extends AnyFlatSpec with should.Matchers {
+
+  val ec = ExecutionContext.global
+  implicit val timer: Timer[IO] = IO.timer(ec)
+  implicit val contextShift: ContextShift[IO] = IO.contextShift(ec)
+
   def check[A: EntityDecoder[IO, *]](actual: IO[Response[IO]],
                                      expectedStatus: http4s.Status,
                                      expectedBody: Option[A]): Boolean = {
@@ -32,7 +38,10 @@ class SpecHelpers(val time: Timestamp) extends AnyFlatSpec with should.Matchers 
     statusCheck && bodyCheck
   }
 
-  val config = ApplicationConfig(HttpConfig("0.0.0.0", 8081, 40.seconds))
+  val config = ApplicationConfig(
+    HttpConfig("0.0.0.0", 8081, 40.seconds),
+    OneFrameConfig("0.0.0.0", 8080, "1234567890")
+  )
 
   val getOneFrameApiResponse1 = GetOneFrameApiResponse(
     from = Currency.USD,
@@ -74,6 +83,4 @@ class SpecHelpers(val time: Timestamp) extends AnyFlatSpec with should.Matchers 
     price = Price(2: Integer),
     timestamp = time
   )
-
-  override def run(args: List[String]): IO[ExitCode] = ExitCode.Success.pure[IO]
 }
