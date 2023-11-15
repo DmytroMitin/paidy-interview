@@ -4,6 +4,7 @@ import cats.effect.Sync
 import cats.syntax.functor._
 import cats.syntax.show._
 import forex.domain.Rate
+import forex.http._
 import forex.http.rates.Protocol.GetOneFrameApiResponse
 import forex.services.rates.NoCachingAlgebra
 import org.http4s.Uri.{Authority, RegName}

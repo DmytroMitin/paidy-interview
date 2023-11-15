@@ -1,15 +1,12 @@
 package forex.http
 package rates
 
-import cats.effect.Sync
 import forex.domain.Currency.show
 import forex.domain.Rate.Pair
 import forex.domain._
 import io.circe._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.semiauto.{deriveConfiguredDecoder, deriveConfiguredEncoder}
-import org.http4s.EntityDecoder
-import org.http4s.circe.jsonOf
 
 object Protocol {
 
@@ -41,8 +38,6 @@ object Protocol {
 
   implicit val responseDecoder: Decoder[GetApiResponse] = deriveConfiguredDecoder
 
-  implicit def responseEntityDecoder[F[_] : Sync]: EntityDecoder[F, GetApiResponse] = jsonOf
-
   final case class GetOneFrameApiResponse(
       from: Currency,
       to: Currency,
@@ -53,7 +48,5 @@ object Protocol {
   )
 
   implicit val oneFrameResponseDecoder: Decoder[GetOneFrameApiResponse] = deriveConfiguredDecoder
-
-  implicit def oneFrameResponseEntityDecoder[F[_] : Sync]: EntityDecoder[F, List[GetOneFrameApiResponse]] = jsonOf
 
 }
