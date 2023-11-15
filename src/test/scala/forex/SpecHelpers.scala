@@ -3,8 +3,7 @@ package forex
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.applicative._
 import forex.config.{ApplicationConfig, HttpConfig, OneFrameConfig}
-import forex.domain.{Currency, Price, Rate, Timestamp}
-import forex.http.rates.Protocol
+import forex.domain.{Currency, Price, Timestamp}
 import forex.http.rates.Protocol.{GetApiResponse, GetOneFrameApiResponse}
 import forex.services.rates.NoCachingAlgebra
 import org.http4s
@@ -62,10 +61,7 @@ class SpecHelpers(val time: Timestamp) extends AnyFlatSpec with should.Matchers 
 
   var getOneFrameApiResponse = getOneFrameApiResponse1
 
-  val noCaching = new NoCachingAlgebra[IO] {
-    override def get(pair: Rate.Pair): IO[List[Protocol.GetOneFrameApiResponse]] =
-      List(getOneFrameApiResponse).pure[IO]
-  }
+  val noCaching: NoCachingAlgebra[IO] = _ => List(getOneFrameApiResponse).pure[IO]
 
   val response: IO[Response[IO]] = new Module[IO](config, noCaching).http.orNotFound.run(
     Request(uri = uri"http://localhost:8081/rates?from=USD&to=JPY")
