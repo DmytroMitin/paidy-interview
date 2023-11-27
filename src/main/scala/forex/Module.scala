@@ -1,7 +1,9 @@
 package forex
 
-import cats.effect.{ Concurrent, Timer }
+import cats.effect.concurrent.MVar2
+import cats.effect.{Concurrent, Timer}
 import forex.config.ApplicationConfig
+import forex.domain.Rate
 import forex.http.rates.RatesHttpRoutes
 import forex.services._
 import forex.programs._
@@ -10,9 +12,13 @@ import org.http4s._
 import org.http4s.implicits._
 import org.http4s.server.middleware.{ AutoSlash, Timeout }
 
-class Module[F[_]: Concurrent: Timer](config: ApplicationConfig, noCaching: NoCachingAlgebra[F]) {
+class Module[F[_]: Concurrent: Timer](
+                                       config: ApplicationConfig,
+                                       noCaching: NoCachingAlgebra[F],
+                                       cache: MVar2[F, Map[Rate.Pair, Rate]]
+                                     ) {
 
-  private val ratesService: RatesService[F] = RatesServices.caching[F](noCaching)
+  private val ratesService: RatesService[F] = RatesServices.caching[F](noCaching, cache)
 
   private val ratesProgram: RatesProgram[F] = RatesProgram[F](ratesService)
 
