@@ -1,6 +1,6 @@
 package forex
 
-import cats.effect.concurrent.{MVar, MVar2, Ref}
+import cats.effect.concurrent.{MVar, MVar2}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.applicative._
 import forex.config.{ApplicationConfig, HttpConfig, OneFrameConfig}
@@ -59,10 +59,8 @@ class OneFrameSpec extends AnyFlatSpec with should.Matchers {
     time_stamp = timestamp
   )
 
-  def noCachingIO(getOneFrameApiResponseRef: Ref[IO, GetOneFrameApiResponse]): IO[NoCachingAlgebra[IO]] =
-    for {
-      getOneFrameApiResponse <- getOneFrameApiResponseRef.get
-    } yield (_ => List(getOneFrameApiResponse).pure[IO]): NoCachingAlgebra[IO]
+  def noCaching(getOneFrameApiResponse: GetOneFrameApiResponse): NoCachingAlgebra[IO] =
+    _ => List(getOneFrameApiResponse).pure[IO]
 
   def responseIO(noCaching: NoCachingAlgebra[IO], cache: MVar2[IO, Map[Rate.Pair, Rate]]): IO[Response[IO]] =
     new Module[IO](config, noCaching, cache)
@@ -92,12 +90,10 @@ class OneFrameSpec extends AnyFlatSpec with should.Matchers {
           ): Boolean =
     (for {
       cache <- MVar.of[IO, Map[Rate.Pair, Rate]](Map.empty)
-      getOneFrameApiResponse <- Ref[IO].of(getOneFrameApiResponse1(timestamp))
-      noCaching1 <- noCachingIO(getOneFrameApiResponse)
+      noCaching1 = noCaching(getOneFrameApiResponse1(timestamp))
       response1 = responseIO(noCaching1, cache)
       res1 <- check[GetApiResponse](response1, http4s.Status.Ok, Some(expected1(timestamp)))
-      _ <- getOneFrameApiResponse.set(getOneFrameApiResponse2(timestamp))
-      noCaching2 <- noCachingIO(getOneFrameApiResponse)
+      noCaching2 = noCaching(getOneFrameApiResponse2(timestamp))
       response2 = responseIO(noCaching2, cache)
       res2 <- check[GetApiResponse](response2, http4s.Status.Ok, Some(expected2(timestamp)))
     } yield res1 && res2).unsafeRunSync()
