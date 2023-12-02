@@ -9,5 +9,5 @@ trait CachingAlgebra[F[_]] {
 }
 
 trait NoCachingAlgebra[F[_]] {
-  def get(pair: Rate.Pair): F[List[GetOneFrameApiResponse]]
+  def get(pairs: List[Rate.Pair]): F[List[GetOneFrameApiResponse]]
 }

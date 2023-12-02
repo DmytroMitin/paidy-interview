@@ -8,7 +8,7 @@ import forex.domain.{Currency, Price, Rate, Timestamp}
 import forex.http.rates.Protocol.{GetApiResponse, GetOneFrameApiResponse}
 import forex.services.rates.NoCachingAlgebra
 import org.http4s
-import org.http4s.{EntityDecoder, Request, Response}
+import org.http4s.{EntityDecoder, Query, Request, Response, Uri}
 import org.http4s.implicits._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
@@ -42,67 +42,99 @@ class OneFrameSpec extends AnyFlatSpec with should.Matchers {
     OneFrameConfig("0.0.0.0", 8080, "1234567890")
   )
 
-  def getOneFrameApiResponse1(timestamp: Timestamp): GetOneFrameApiResponse = GetOneFrameApiResponse(
-    from = Currency.USD,
-    to = Currency.JPY,
-    bid = Price(1: Integer),
-    ask = Price(1: Integer),
-    price = Price(1: Integer),
-    time_stamp = timestamp
-  )
-  def getOneFrameApiResponse2(timestamp: Timestamp): GetOneFrameApiResponse = GetOneFrameApiResponse(
-    from = Currency.USD,
-    to = Currency.JPY,
-    bid = Price(2: Integer),
-    ask = Price(2: Integer),
-    price = Price(2: Integer),
-    time_stamp = timestamp
-  )
+  def getOneFrameApiResponse(
+                              from: Currency,
+                              to: Currency,
+                              price: Int,
+                              timestamp: Timestamp
+                            ): GetOneFrameApiResponse =
+    GetOneFrameApiResponse(
+      from = from,
+      to = to,
+      bid = Price(price: Integer),
+      ask = Price(price: Integer),
+      price = Price(price: Integer),
+      time_stamp = timestamp
+    )
 
-  def noCaching(getOneFrameApiResponse: GetOneFrameApiResponse): NoCachingAlgebra[IO] =
-    _ => List(getOneFrameApiResponse).pure[IO]
+  def getOneFrameApiResponse1UsdJpy(timestamp: Timestamp): GetOneFrameApiResponse =
+    getOneFrameApiResponse(Currency.USD, Currency.JPY, 1, timestamp)
+  def getOneFrameApiResponse2UsdJpy(timestamp: Timestamp): GetOneFrameApiResponse =
+    getOneFrameApiResponse(Currency.USD, Currency.JPY, 2, timestamp)
+  def getOneFrameApiResponse1UsdEur(timestamp: Timestamp): GetOneFrameApiResponse =
+    getOneFrameApiResponse(Currency.USD, Currency.EUR, 3, timestamp)
+  def getOneFrameApiResponse2UsdEur(timestamp: Timestamp): GetOneFrameApiResponse =
+    getOneFrameApiResponse(Currency.USD, Currency.EUR, 4, timestamp)
 
-  def responseIO(noCaching: NoCachingAlgebra[IO], cache: MVar2[IO, Map[Rate.Pair, Rate]]): IO[Response[IO]] =
+  def noCaching(getOneFrameApiResponses: List[GetOneFrameApiResponse]): NoCachingAlgebra[IO] =
+    _ => getOneFrameApiResponses.pure[IO]
+
+  def responseIO(
+                  from: String,
+                  to: String,
+                  noCaching: NoCachingAlgebra[IO],
+                  cache: MVar2[IO, Map[Rate.Pair, Rate]]
+                ): IO[Response[IO]] =
     new Module[IO](config, noCaching, cache)
       .http
       .orNotFound
       .run(
-        Request(uri = uri"http://localhost:8081/rates?from=USD&to=JPY")
+        Request(uri = Uri(
+          scheme = Some(Uri.Scheme.http),
+          authority = Some(Uri.Authority(host = Uri.RegName("localhost"), port = Some(8081))),
+          path = "/rates",
+          query = Query.fromString(s"from=$from&to=$to")
+        ))
       )
 
-  def expected1(timestamp: Timestamp): GetApiResponse = GetApiResponse(
-    from = Currency.USD,
-    to = Currency.JPY,
-    price = Price(1: Integer),
-    timestamp = timestamp
-  )
-  def expected2(timestamp: Timestamp): GetApiResponse = GetApiResponse(
-    from = Currency.USD,
-    to = Currency.JPY,
-    price = Price(2: Integer),
-    timestamp = timestamp
-  )
+  def responseUsdJpyIO(noCaching: NoCachingAlgebra[IO], cache: MVar2[IO, Map[Rate.Pair, Rate]]): IO[Response[IO]] =
+    responseIO("USD", "JPY", noCaching, cache)
+  def responseUsdEurIO(noCaching: NoCachingAlgebra[IO], cache: MVar2[IO, Map[Rate.Pair, Rate]]): IO[Response[IO]] =
+    responseIO("USD", "EUR", noCaching, cache)
+
+  def expected(from: Currency, to: Currency, price: Int, timestamp: Timestamp): GetApiResponse =
+    GetApiResponse(
+      from = from,
+      to = to,
+      price = Price(price: Integer),
+      timestamp = timestamp
+    )
+
+  def expected1UsdJpy(timestamp: Timestamp): GetApiResponse =
+    expected(Currency.USD, Currency.JPY, 1, timestamp)
+  def expected2UsdJpy(timestamp: Timestamp): GetApiResponse =
+    expected(Currency.USD, Currency.JPY, 2, timestamp)
+  def expected1UsdEur(timestamp: Timestamp): GetApiResponse =
+    expected(Currency.USD, Currency.EUR, 3, timestamp)
+  def expected2UsdEur(timestamp: Timestamp): GetApiResponse =
+    expected(Currency.USD, Currency.EUR, 4, timestamp)
 
   def test(
-            expected1: Timestamp => GetApiResponse,
-            expected2: Timestamp => GetApiResponse,
+            expected1UsdJpy: Timestamp => GetApiResponse,
+            expected2UsdJpy: Timestamp => GetApiResponse,
+            expected1UsdEur: Timestamp => GetApiResponse,
+            expected2UsdEur: Timestamp => GetApiResponse,
             timestamp: Timestamp
           ): Boolean =
     (for {
       cache <- MVar.of[IO, Map[Rate.Pair, Rate]](Map.empty)
-      noCaching1 = noCaching(getOneFrameApiResponse1(timestamp))
-      response1 = responseIO(noCaching1, cache)
-      res1 <- check[GetApiResponse](response1, http4s.Status.Ok, Some(expected1(timestamp)))
-      noCaching2 = noCaching(getOneFrameApiResponse2(timestamp))
-      response2 = responseIO(noCaching2, cache)
-      res2 <- check[GetApiResponse](response2, http4s.Status.Ok, Some(expected2(timestamp)))
-    } yield res1 && res2).unsafeRunSync()
+      noCaching1 = noCaching(List(getOneFrameApiResponse1UsdJpy(timestamp), getOneFrameApiResponse1UsdEur(timestamp)))
+      response1UsdJpy = responseUsdJpyIO(noCaching1, cache)
+      response1UsdEur = responseUsdEurIO(noCaching1, cache)
+      res1UsdJpy <- check[GetApiResponse](response1UsdJpy, http4s.Status.Ok, Some(expected1UsdJpy(timestamp)))
+      res1UsdEur <- check[GetApiResponse](response1UsdEur, http4s.Status.Ok, Some(expected1UsdEur(timestamp)))
+      noCaching2 = noCaching(List(getOneFrameApiResponse2UsdJpy(timestamp), getOneFrameApiResponse2UsdEur(timestamp)))
+      response2UsdJpy = responseUsdJpyIO(noCaching2, cache)
+      response2UsdEur = responseUsdEurIO(noCaching2, cache)
+      res2UsdJpy <- check[GetApiResponse](response2UsdJpy, http4s.Status.Ok, Some(expected2UsdJpy(timestamp)))
+      res2UsdEur <- check[GetApiResponse](response2UsdEur, http4s.Status.Ok, Some(expected2UsdEur(timestamp)))
+    } yield res1UsdJpy && res2UsdJpy && res1UsdEur && res2UsdEur).unsafeRunSync()
 
   "Caching service with actual cache" should "firstly return rate from One-Frame, secondly return rate from cache" in {
-    test(expected1, expected1, Timestamp.now) should be(true)
+    test(expected1UsdJpy, expected1UsdJpy, expected1UsdEur, expected1UsdEur, Timestamp.now) should be(true)
   }
 
   "Caching service with outdated cache" should "return rate from One-Frame both times" in {
-    test(expected1, expected2, Timestamp.nowMinus5Minutes) should be(true)
+    test(expected1UsdJpy, expected2UsdJpy, expected1UsdEur, expected2UsdEur, Timestamp.nowMinus5Minutes) should be(true)
   }
 }

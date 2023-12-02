@@ -21,11 +21,11 @@ class OneFrameNoCaching[F[_]: Sync](
 
   private val logger = getLogger
 
-  override def get(pair: Rate.Pair): F[List[GetOneFrameApiResponse]] = {
+  override def get(pairs: List[Rate.Pair]): F[List[GetOneFrameApiResponse]] = {
     val oneFrameAuthority = Some(Authority(host = RegName(oneFrameHost), port = Some(oneFramePort)))
-    val request = Request[F](
-      uri = Uri(authority = oneFrameAuthority) / "rates" +? ("pair", pair.from.show + pair.to.show)
-    ).putHeaders(Header("token", oneFrameToken))
+    val oneFrameUri = Uri(authority = oneFrameAuthority) / "rates" +? ("pair", pairs.map(_.show))
+    val request = Request[F](uri = oneFrameUri)
+      .putHeaders(Header("token", oneFrameToken))
     logger.info(s"One-frame request: $request")
 
     for {
