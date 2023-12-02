@@ -130,11 +130,11 @@ class OneFrameSpec extends AnyFlatSpec with should.Matchers {
       res2UsdEur <- check[GetApiResponse](response2UsdEur, http4s.Status.Ok, Some(expected2UsdEur(timestamp)))
     } yield res1UsdJpy && res2UsdJpy && res1UsdEur && res2UsdEur).unsafeRunSync()
 
-  "Caching service with actual cache" should "firstly return rate from One-Frame, secondly return rate from cache" in {
+  "Caching service with actual cache" should "firstly return rates from One-Frame, secondly return rates from cache" in {
     test(expected1UsdJpy, expected1UsdJpy, expected1UsdEur, expected1UsdEur, Timestamp.now) should be(true)
   }
 
-  "Caching service with outdated cache" should "return rate from One-Frame both times" in {
+  "Caching service with outdated cache" should "return rates from One-Frame both times" in {
     test(expected1UsdJpy, expected2UsdJpy, expected1UsdEur, expected2UsdEur, Timestamp.nowMinus5Minutes) should be(true)
   }
 }
