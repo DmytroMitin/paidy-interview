@@ -1,7 +1,8 @@
 package forex
 
+import cats.effect.std.Queue
 import cats.effect.unsafe.IORuntime
-import cats.effect.{IO, Ref}
+import cats.effect.IO
 import cats.syntax.applicative._
 import forex.config.{ApplicationConfig, HttpConfig, OneFrameConfig}
 import forex.domain.{Currency, Price, Rate, Timestamp}
@@ -12,6 +13,7 @@ import org.http4s.{EntityDecoder, Query, Request, Response, Uri}
 import org.http4s.implicits._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
+
 import scala.concurrent.duration._
 
 class OneFrameSpec extends AnyFlatSpec with should.Matchers {
@@ -70,7 +72,7 @@ class OneFrameSpec extends AnyFlatSpec with should.Matchers {
                   from: String,
                   to: String,
                   noCaching: NoCachingAlgebra[IO],
-                  cache: Ref[IO, Map[Rate.Pair, Rate]]
+                  cache: Queue[IO, Map[Rate.Pair, Rate]]
                 ): IO[Response[IO]] =
     new Module[IO](config, noCaching, cache)
       .http
@@ -84,9 +86,9 @@ class OneFrameSpec extends AnyFlatSpec with should.Matchers {
         ))
       )
 
-  def responseUsdJpyIO(noCaching: NoCachingAlgebra[IO], cache: Ref[IO, Map[Rate.Pair, Rate]]): IO[Response[IO]] =
+  def responseUsdJpyIO(noCaching: NoCachingAlgebra[IO], cache: Queue[IO, Map[Rate.Pair, Rate]]): IO[Response[IO]] =
     responseIO("USD", "JPY", noCaching, cache)
-  def responseUsdEurIO(noCaching: NoCachingAlgebra[IO], cache: Ref[IO, Map[Rate.Pair, Rate]]): IO[Response[IO]] =
+  def responseUsdEurIO(noCaching: NoCachingAlgebra[IO], cache: Queue[IO, Map[Rate.Pair, Rate]]): IO[Response[IO]] =
     responseIO("USD", "EUR", noCaching, cache)
 
   def expected(from: Currency, to: Currency, price: Int, timestamp: Timestamp): GetApiResponse =
@@ -114,7 +116,8 @@ class OneFrameSpec extends AnyFlatSpec with should.Matchers {
             timestamp: Timestamp
           ): Boolean =
     (for {
-      cache <- Ref.of[IO, Map[Rate.Pair, Rate]](Map.empty)
+      cache <- Queue.bounded[IO, Map[Rate.Pair, Rate]](1)
+      _ <- cache.offer(Map.empty)
       noCaching1 = noCaching(List(getOneFrameApiResponse1UsdJpy(timestamp), getOneFrameApiResponse1UsdEur(timestamp)))
       response1UsdJpy = responseUsdJpyIO(noCaching1, cache)
       response1UsdEur = responseUsdEurIO(noCaching1, cache)

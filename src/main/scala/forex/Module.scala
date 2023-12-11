@@ -1,6 +1,7 @@
 package forex
 
-import cats.effect.{Async, Deferred, Ref}
+import cats.effect.std.Queue
+import cats.effect.Async
 import forex.config.ApplicationConfig
 import forex.domain.Rate
 import forex.http.rates.RatesHttpRoutes
@@ -14,7 +15,7 @@ import org.http4s.server.middleware.{AutoSlash, Timeout}
 class Module[F[_]: Async](
                            config: ApplicationConfig,
                            noCaching: NoCachingAlgebra[F],
-                           cache: Ref[F, Deferred[F, Map[Rate.Pair, Rate]]]
+                           cache: Queue[F, Map[Rate.Pair, Rate]]
                          ) {
 
   private val ratesService: RatesService[F] = RatesServices.caching[F](noCaching, cache)
