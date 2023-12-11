@@ -29,3 +29,5 @@ Local proxy can be started with `sbt run`.
 Requests look like http://localhost:8081/rates?from=USD&to=JPY.
 
 Tests can be run with `sbt test`.
+
+The project runs in Java 11+.

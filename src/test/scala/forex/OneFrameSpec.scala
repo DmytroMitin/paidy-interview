@@ -1,7 +1,7 @@
 package forex
 
-import cats.effect.concurrent.{MVar, MVar2}
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.unsafe.IORuntime
+import cats.effect.{IO, Ref}
 import cats.syntax.applicative._
 import forex.config.{ApplicationConfig, HttpConfig, OneFrameConfig}
 import forex.domain.{Currency, Price, Rate, Timestamp}
@@ -12,14 +12,11 @@ import org.http4s.{EntityDecoder, Query, Request, Response, Uri}
 import org.http4s.implicits._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 class OneFrameSpec extends AnyFlatSpec with should.Matchers {
 
-  val ec = ExecutionContext.global
-  implicit val timer: Timer[IO] = IO.timer(ec)
-  implicit val contextShift: ContextShift[IO] = IO.contextShift(ec)
+  implicit val runtime: IORuntime = IORuntime.global
 
   def check[A: EntityDecoder[IO, *]](actualRespIO: IO[Response[IO]],
                                      expectedStatus: http4s.Status,
@@ -73,7 +70,7 @@ class OneFrameSpec extends AnyFlatSpec with should.Matchers {
                   from: String,
                   to: String,
                   noCaching: NoCachingAlgebra[IO],
-                  cache: MVar2[IO, Map[Rate.Pair, Rate]]
+                  cache: Ref[IO, Map[Rate.Pair, Rate]]
                 ): IO[Response[IO]] =
     new Module[IO](config, noCaching, cache)
       .http
@@ -82,14 +79,14 @@ class OneFrameSpec extends AnyFlatSpec with should.Matchers {
         Request(uri = Uri(
           scheme = Some(Uri.Scheme.http),
           authority = Some(Uri.Authority(host = Uri.RegName("localhost"), port = Some(8081))),
-          path = "/rates",
-          query = Query.fromString(s"from=$from&to=$to")
+          path = Uri.Path(Vector(Uri.Path.Segment("rates")), absolute = true),
+          query = Query.fromMap(Map("from" -> Seq(from), "to" -> Seq(to)))
         ))
       )
 
-  def responseUsdJpyIO(noCaching: NoCachingAlgebra[IO], cache: MVar2[IO, Map[Rate.Pair, Rate]]): IO[Response[IO]] =
+  def responseUsdJpyIO(noCaching: NoCachingAlgebra[IO], cache: Ref[IO, Map[Rate.Pair, Rate]]): IO[Response[IO]] =
     responseIO("USD", "JPY", noCaching, cache)
-  def responseUsdEurIO(noCaching: NoCachingAlgebra[IO], cache: MVar2[IO, Map[Rate.Pair, Rate]]): IO[Response[IO]] =
+  def responseUsdEurIO(noCaching: NoCachingAlgebra[IO], cache: Ref[IO, Map[Rate.Pair, Rate]]): IO[Response[IO]] =
     responseIO("USD", "EUR", noCaching, cache)
 
   def expected(from: Currency, to: Currency, price: Int, timestamp: Timestamp): GetApiResponse =
@@ -117,7 +114,7 @@ class OneFrameSpec extends AnyFlatSpec with should.Matchers {
             timestamp: Timestamp
           ): Boolean =
     (for {
-      cache <- MVar.of[IO, Map[Rate.Pair, Rate]](Map.empty)
+      cache <- Ref.of[IO, Map[Rate.Pair, Rate]](Map.empty)
       noCaching1 = noCaching(List(getOneFrameApiResponse1UsdJpy(timestamp), getOneFrameApiResponse1UsdEur(timestamp)))
       response1UsdJpy = responseUsdJpyIO(noCaching1, cache)
       response1UsdEur = responseUsdEurIO(noCaching1, cache)

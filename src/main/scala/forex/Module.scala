@@ -1,7 +1,6 @@
 package forex
 
-import cats.effect.concurrent.MVar2
-import cats.effect.{Concurrent, Timer}
+import cats.effect.{Async, Deferred, Ref}
 import forex.config.ApplicationConfig
 import forex.domain.Rate
 import forex.http.rates.RatesHttpRoutes
@@ -10,13 +9,13 @@ import forex.programs._
 import forex.services.rates.NoCachingAlgebra
 import org.http4s._
 import org.http4s.implicits._
-import org.http4s.server.middleware.{ AutoSlash, Timeout }
+import org.http4s.server.middleware.{AutoSlash, Timeout}
 
-class Module[F[_]: Concurrent: Timer](
-                                       config: ApplicationConfig,
-                                       noCaching: NoCachingAlgebra[F],
-                                       cache: MVar2[F, Map[Rate.Pair, Rate]]
-                                     ) {
+class Module[F[_]: Async](
+                           config: ApplicationConfig,
+                           noCaching: NoCachingAlgebra[F],
+                           cache: Ref[F, Deferred[F, Map[Rate.Pair, Rate]]]
+                         ) {
 
   private val ratesService: RatesService[F] = RatesServices.caching[F](noCaching, cache)
 

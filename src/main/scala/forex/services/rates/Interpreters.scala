@@ -1,8 +1,7 @@
 package forex.services.rates
 
 import cats.Applicative
-import cats.effect.Concurrent
-import cats.effect.concurrent.MVar2
+import cats.effect.{Concurrent, Deferred, Ref}
 import forex.domain.Rate
 import interpreters._
 
@@ -11,7 +10,7 @@ object Interpreters {
 
   def caching[F[_]: Concurrent](
       noCaching: NoCachingAlgebra[F],
-      cache: MVar2[F, Map[Rate.Pair, Rate]]
+      cache: Ref[F, Deferred[F, Map[Rate.Pair, Rate]]]
   ): CachingAlgebra[F] =
     new OneFrameCaching[F](noCaching, cache)
 

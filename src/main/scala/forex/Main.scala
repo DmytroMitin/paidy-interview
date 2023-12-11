@@ -1,35 +1,37 @@
 package forex
 
 import cats.effect._
-import cats.effect.concurrent.MVar
+import com.comcast.ip4s.{Host, IpLiteralSyntax, Port}
 import forex.config._
 import forex.domain.Rate
 import forex.services.rates.interpreters.OneFrameNoCaching
-import fs2.Stream
-import org.http4s.client.blaze.BlazeClientBuilder
-import org.http4s.server.blaze.BlazeServerBuilder
-import scala.concurrent.ExecutionContext
+import fs2.io.net.Network
+import org.http4s.ember.client.EmberClientBuilder
+import org.http4s.ember.server.EmberServerBuilder
 
-object Main extends IOApp {
+object Main extends IOApp.Simple {
 
-  override def run(args: List[String]): IO[ExitCode] =
-    new Application[IO].stream(executionContext).compile.drain.as(ExitCode.Success)
+  override val run: IO[Unit] =
+    new Application[IO].resource.useForever
 
 }
 
-class Application[F[_]: ConcurrentEffect: Timer] {
+class Application[F[_]: Async: Network] {
 
-  def stream(ec: ExecutionContext): Stream[F, Unit] =
+  val resource: Resource[F, Unit] =
     for {
-      config <- Config.stream("app")
-      client <- BlazeClientBuilder[F](ec).stream
+      config <- Config.resource("app")
+      client <- EmberClientBuilder.default[F].build
       noCaching = new OneFrameNoCaching[F](client, config.oneFrame.host, config.oneFrame.port, config.oneFrame.token)
-      cache <- Stream.eval(MVar.of(Map.empty[Rate.Pair, Rate]))
+      deferred <- Resource.eval(Deferred[F, Map[Rate.Pair, Rate]])
+      _ <- Resource.eval(deferred.complete(Map.empty))
+      cache <- Resource.eval(Ref.of(deferred))
       module = new Module[F](config, noCaching, cache)
-      _ <- BlazeServerBuilder[F](ec)
-            .bindHttp(config.http.port, config.http.host)
+      _ <- EmberServerBuilder.default[F]
+            .withHost(Host.fromString(config.http.host).getOrElse(ipv4"0.0.0.0"))
+            .withPort(Port.fromInt(config.http.port).getOrElse(port"8080"))
             .withHttpApp(module.httpApp)
-            .serve
+            .build
     } yield ()
 
 }

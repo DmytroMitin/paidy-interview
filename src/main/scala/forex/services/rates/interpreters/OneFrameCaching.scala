@@ -1,7 +1,6 @@
 package forex.services.rates.interpreters
 
-import cats.effect.Concurrent
-import cats.effect.concurrent.MVar2
+import cats.effect.{Concurrent, Deferred, Ref}
 import cats.syntax.flatMap._
 import cats.syntax.either._
 import cats.syntax.functor._
@@ -13,7 +12,7 @@ import forex.services.rates.errors._
 
 class OneFrameCaching[F[_]: Concurrent](
                                          noCaching: NoCachingAlgebra[F],
-                                         cache: MVar2[F, Map[Rate.Pair, Rate]]
+                                         cache: Ref[F, Deferred[F, Map[Rate.Pair, Rate]]]
                                        ) extends CachingAlgebra[F] {
 
   override def get(pair: Rate.Pair): F[Error Either Rate] = {
@@ -26,7 +25,9 @@ class OneFrameCaching[F[_]: Concurrent](
         })
 
         for {
-          _ <- cache.put(newMap)
+          deferred <- Deferred[F, Map[Rate.Pair, Rate]]
+          _ <- deferred.complete(newMap)
+          _ <- cache.set(deferred)
         } yield newMap.get(pair).toRight(
           Error.OneFrameLookupFailed(s"One-Frame service returned no result for pair $pair")
         )
@@ -35,7 +36,9 @@ class OneFrameCaching[F[_]: Concurrent](
       map.get(pair) match {
         case Some(rate) if rate.timestamp.isNotOlderThan5Minutes =>
           for {
-            _ <- cache.put(map)
+            deferred <- Deferred[F, Map[Rate.Pair, Rate]]
+            _ <- deferred.complete(map)
+            _ <- cache.set(deferred)
           } yield rate.asRight[Error]
         case _ =>
           for {
@@ -46,7 +49,8 @@ class OneFrameCaching[F[_]: Concurrent](
     }
 
     for {
-      map <- cache.take
+      d <- cache.get
+      map <- d.get
       res <- getFromCacheOrResponse(map)
     } yield res
   }
